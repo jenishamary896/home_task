@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Online Quiz Application</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body {
+      background: linear-gradient(135deg, #89f7fe, #66a6ff);
+      font-family: 'Poppins', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      color: #333;
+    }
+
+    .container-box {
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+      width: 500px;
+      text-align: center;
+    }
+
+    .option {
+      background-color: #f8f9fa;
+      border: 2px solid transparent;
+      border-radius: 10px;
+      padding: 10px;
+      margin: 10px 0;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .option:hover { background-color: #e2e6ea; }
+    .correct { background-color: #d4edda !important; border-color: #28a745 !important; color: #155724; }
+    .wrong { background-color: #f8d7da !important; border-color: #dc3545 !important; color: #721c24; }
+
+    .timer { font-size: 1.2em; font-weight: bold; color: #dc3545; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+
+  <!-- LOGIN PAGE -->
+  <div class="container-box" id="loginPage">
+    <h2>🎯 Login Page</h2>
+    <div id="emoji" style="font-size:50px;">🙂</div>
+    <input type="text" id="username" class="form-control mb-2" placeholder="Username" required>
+    <input type="email" id="email" class="form-control mb-2" placeholder="Email" required>
+    <input type="password" id="password" class="form-control mb-2" placeholder="Password" required>
+    <input type="text" id="pin" class="form-control mb-2" placeholder="Secret PIN" required>
+    <div class="mb-2">
+      <label><input type="radio" name="gender" value="male"> Male</label>
+      <label><input type="radio" name="gender" value="female"> Female</label>
+    </div>
+    <button class="btn btn-success w-100" onclick="goToCategory()">Next</button>
+    <button class="btn btn-warning w-100 mt-2" onclick="showRejoinPage()">Rejoin Quiz</button>
+  </div>
+
+  <!-- REJOIN PAGE -->
+  <div class="container-box hidden" id="rejoinPage">
+    <h2>🔐 Resume Quiz</h2>
+    <input type="text" id="rejoinPin" class="form-control mb-3" placeholder="Enter your Secret PIN">
+    <button class="btn btn-primary w-100" onclick="rejoinQuiz()">Resume</button>
+    <button class="btn btn-secondary w-100 mt-2" onclick="backToLogin()">Back</button>
+  </div>
+
+  <!-- CATEGORY PAGE -->
+  <div class="container-box hidden" id="categoryPage">
+    <h2 id="welcome"></h2>
+    <p>Select Category and Difficulty Level:</p>
+    <select id="category" class="form-select mb-3">
+      <option value="technical">Technical</option>
+      <option value="non-technical">Non-Technical</option>
+      <option value="maths">Maths</option>
+    </select>
+    <select id="level" class="form-select mb-3">
+      <option value="easy">Easy</option>
+      <option value="medium">Medium</option>
+      <option value="hard">Hard</option>
+    </select>
+    <button class="btn btn-primary w-100" onclick="startQuiz()">Start Quiz</button>
+  </div>
+
+  <!-- QUIZ PAGE -->
+  <div class="container-box hidden" id="quizPage">
+    <h2 id="userTitle"></h2>
+    <h4 id="categoryLevel"></h4>
+    <p id="progressText" class="text-muted"></p>
+    <div id="questionBox" class="mt-3">
+      <h5 id="questionText"></h5>
+      <div id="options"></div>
+      <p class="timer mt-3">⏳ Time left: <span id="time">30</span>s</p>
+    </div>
+  </div>
+
+  <!-- RESULT PAGE -->
+  <div class="container-box hidden" id="resultPage">
+    <h2>🏆 Quiz Completed!</h2>
+    <h4 id="resultText"></h4>
+    <canvas id="scoreChart" width="300" height="300"></canvas>
+    <button class="btn btn-info w-100 mt-3" onclick="showLeaderboard()">View Leaderboard</button>
+  </div>
+
+  <!-- LEADERBOARD PAGE -->
+  <div class="container-box hidden" id="leaderboardPage">
+    <h2>🏅 Leaderboard</h2>
+    <table class="table table-bordered mt-3">
+      <thead><tr><th>Name</th><th>Score</th><th>Category</th><th>Level</th></tr></thead>
+      <tbody id="leaderboard"></tbody>
+    </table>
+    <button class="btn btn-success w-100" onclick="location.reload()">Play Again</button>
+  </div>
+
+  <script>
+    let username = "", gender = "", category = "", level = "", pin = "";
+    let allQuestions = [], filteredQuestions = [], currentIndex = 0, timer, timeLeft = 30, score = 0;
+
+    // 👤 LOGIN PAGE
+    document.querySelectorAll('input[name="gender"]').forEach(g => {
+      g.addEventListener('change', () => {
+        document.getElementById('emoji').textContent = g.value === 'male' ? '🧑' : '👩';
+      });
+    });
+
+    function goToCategory() {
+      username = document.getElementById('username').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value.trim();
+      pin = document.getElementById('pin').value.trim();
+      gender = document.querySelector('input[name="gender"]:checked')?.value;
+
+      if (!username || !email || !password || !pin || !gender) {
+        alert("Please fill all fields!");
+        return;
+      }
+
+      document.getElementById('loginPage').classList.add('hidden');
+      document.getElementById('categoryPage').classList.remove('hidden');
+      document.getElementById('welcome').innerHTML = `Welcome ${username}! ${gender === 'male' ? '🧑' : '👩'}`;
+    }
+
+    function showRejoinPage() {
+      document.getElementById('loginPage').classList.add('hidden');
+      document.getElementById('rejoinPage').classList.remove('hidden');
+    }
+
+    function backToLogin() {
+      document.getElementById('rejoinPage').classList.add('hidden');
+      document.getElementById('loginPage').classList.remove('hidden');
+    }
+
+    // 🔁 REJOIN QUIZ
+    function rejoinQuiz() {
+      const enteredPin = document.getElementById('rejoinPin').value.trim();
+      if (!enteredPin) return alert("Enter your PIN!");
+
+      const savedData = JSON.parse(localStorage.getItem("quizProgress"));
+      if (savedData && savedData.pin === enteredPin) {
+        username = savedData.username;
+        category = savedData.category;
+        level = savedData.level;
+        currentIndex = savedData.currentIndex;
+        score = savedData.score;
+
+        document.getElementById('rejoinPage').classList.add('hidden');
+        document.getElementById('quizPage').classList.remove('hidden');
+        document.getElementById('userTitle').innerText = `Welcome back, ${username}!`;
+        document.getElementById('categoryLevel').innerText = `Category: ${category} | Level: ${level}`;
+
+        fetch('questions.json')
+          .then(res => res.json())
+          .then(data => {
+            allQuestions = data[category][level];
+            filteredQuestions = allQuestions;
+            showQuestion();
+          });
+      } else {
+        alert("Invalid PIN or no quiz found!");
+      }
+    }
+
+    // 🎯 CATEGORY PAGE
+    function startQuiz() {
+      category = document.getElementById('category').value;
+      level = document.getElementById('level').value;
+
+      document.getElementById('categoryPage').classList.add('hidden');
+      document.getElementById('quizPage').classList.remove('hidden');
+      document.getElementById('userTitle').innerText = `Good Luck, ${username}!`;
+      document.getElementById('categoryLevel').innerText = `Category: ${category} | Level: ${level}`;
+
+      fetch('questions.json')
+        .then(res => res.json())
+        .then(data => {
+          allQuestions = data[category][level];
+          filteredQuestions = allQuestions.sort(() => 0.5 - Math.random()).slice(0, 10);
+          currentIndex = 0;
+          score = 0;
+          showQuestion();
+        })
+        .catch(err => console.error('Error loading questions:', err));
+    }
+
+    // 🧠 QUIZ LOGIC
+    function showQuestion() {
+      if (currentIndex >= filteredQuestions.length) {
+        endQuiz();
+        return;
+      }
+
+      const q = filteredQuestions[currentIndex];
+      document.getElementById('questionText').innerText = q.question;
+      document.getElementById('progressText').innerText = `Question ${currentIndex + 1} of ${filteredQuestions.length}`;
+      const optionsDiv = document.getElementById('options');
+      optionsDiv.innerHTML = '';
+
+      q.options.forEach(opt => {
+        const btn = document.createElement('div');
+        btn.className = 'option';
+        btn.innerText = opt;
+        btn.onclick = () => checkAnswer(btn, q.answer);
+        optionsDiv.appendChild(btn);
+      });
+
+      saveProgress();
+      resetTimer();
+    }
+
+    function checkAnswer(selected, correct) {
+      const options = document.querySelectorAll('.option');
+      options.forEach(o => o.style.pointerEvents = 'none');
+
+      if (selected.innerText === correct) {
+        selected.classList.add('correct');
+        score++;
+      } else {
+        selected.classList.add('wrong');
+        options.forEach(o => {
+          if (o.innerText === correct) o.classList.add('correct');
+        });
+      }
+
+      clearInterval(timer);
+      setTimeout(() => {
+        currentIndex++;
+        showQuestion();
+      }, 1500);
+    }
+
+    function resetTimer() {
+      clearInterval(timer);
+      timeLeft = 30;
+      document.getElementById('time').innerText = timeLeft;
+
+      timer = setInterval(() => {
+        timeLeft--;
+        document.getElementById('time').innerText = timeLeft;
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          currentIndex++;
+          showQuestion();
+        }
+      }, 1000);
+    }
+
+    // 💾 SAVE PROGRESS
+    function saveProgress() {
+      const progress = { username, pin, category, level, currentIndex, score };
+      localStorage.setItem("quizProgress", JSON.stringify(progress));
+    }
+
+    // 🏁 END QUIZ
+    function endQuiz() {
+      clearInterval(timer);
+      localStorage.removeItem("quizProgress");
+
+      document.getElementById('quizPage').classList.add('hidden');
+      document.getElementById('resultPage').classList.remove('hidden');
+
+      document.getElementById('resultText').innerText = `${username}, you scored ${score} / ${filteredQuestions.length}`;
+
+      new Chart(document.getElementById('scoreChart'), {
+        type: 'pie',
+        data: {
+          labels: ['Correct', 'Wrong'],
+          datasets: [{
+            data: [score, filteredQuestions.length - score],
+            backgroundColor: ['#28a745', '#dc3545']
+          }]
+        }
+      });
+
+      const leaderboard = JSON.parse(localStorage.getItem("leaderboard")) || [];
+      leaderboard.push({ username, score, category, level });
+      localStorage.setItem("leaderboard", JSON.stringify(leaderboard));
+    }
+
+    // 🏅 LEADERBOARD
+    function showLeaderboard() {
+      document.getElementById('resultPage').classList.add('hidden');
+      document.getElementById('leaderboardPage').classList.remove('hidden');
+
+      const leaderboard = JSON.parse(localStorage.getItem("leaderboard")) || [];
+      leaderboard.sort((a,b) => b.score - a.score);
+      const tbody = document.getElementById('leaderboard');
+      tbody.innerHTML = leaderboard.map(l =>
+        `<tr><td>${l.username}</td><td>${l.score}</td><td>${l.category}</td><td>${l.level}</td></tr>`
+      ).join('');
+    }
+  </script>
+</body>
+</html>
